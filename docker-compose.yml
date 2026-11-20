@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  jetweir:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jetweir
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      JETWEIR_LISTEN_ADDR: "0.0.0.0"
+      JETWEIR_LISTEN_PORT: "8080"
+      JETWEIR_UPSTREAM_URL: "wss://jetstream2.us-west.firehose.bluesky.net/subscribe"
+      JETWEIR_BUFFER_SIZE: "10000"
+      JETWEIR_METRICS_ENABLED: "true"
+      JETWEIR_METRICS_PORT: "9090"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - jetweir
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./examples/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    depends_on:
+      - jetweir
+    networks:
+      - jetweir
+
+networks:
+  jetweir:
+    driver: bridge
+
+volumes:
+  prometheus-data:
